@@ -6,7 +6,7 @@ from geopy.distance import geodesic
 import googlemaps
 
 # Google Maps API key
-gmaps = googlemaps.Client(key="AIzaSyDwQVuPcON3rGSibcBrwhxQvz4HLTpF9Ws")
+gmaps = googlemaps.Client(key="YOUR_GOOGLE_MAPS_API_KEY")
 
 st.set_page_config("Montaj Rota Planlayıcı", layout="wide")
 st.title("🛠️ Montaj Rota Planlayıcı ve Maliyet Hesaplayıcı")
@@ -111,32 +111,35 @@ if len(st.session_state.girisler) > 0:
 
         # Check if the Bayi address is not empty
         if bayi_adi:
-            # Get route using Google Maps Directions API
-            directions = gmaps.directions(baslangic_sehri, bayi_adi, mode="driving")
+            # Get the coordinates of the bayi address using Google Geocoding API
+            geocode_result = gmaps.geocode(bayi_adi)
 
-            # Create a map centered on the starting city
-            m = folium.Map(location=sehir_koordinatlari[baslangic_sehri], zoom_start=6)
+            if geocode_result:
+                bayi_koordinat = geocode_result[0]['geometry']['location']
+                bayi_lat = bayi_koordinat['lat']
+                bayi_lng = bayi_koordinat['lng']
 
-            # Add directions as a polyline on the map
-            for step in directions[0]['legs'][0]['steps']:
-                folium.Marker([step['end_location']['lat'], step['end_location']['lng']], 
-                              popup=step['html_instructions']).add_to(m)
+                # Create a map centered on the starting city
+                m = folium.Map(location=sehir_koordinatlari[baslangic_sehri], zoom_start=6)
 
-            # Add markers for the starting and destination cities
-            folium.Marker(
-                sehir_koordinatlari[baslangic_sehri],
-                popup=baslangic_sehri,
-                tooltip="Başlangıç Şehri"
-            ).add_to(m)
+                # Add a marker for the starting city
+                folium.Marker(
+                    sehir_koordinatlari[baslangic_sehri],
+                    popup=baslangic_sehri,
+                    tooltip="Başlangıç Şehri"
+                ).add_to(m)
 
-            folium.Marker(
-                directions[0]['legs'][0]['end_address'],
-                popup=bayi_adi,
-                tooltip="Bayi Adresi"
-            ).add_to(m)
+                # Add a marker for the bayi address
+                folium.Marker(
+                    [bayi_lat, bayi_lng],
+                    popup=bayi_adi,
+                    tooltip="Bayi Adresi"
+                ).add_to(m)
 
-            # Display map
-            st_folium(m, width=700, height=400)
+                # Display map
+                st_folium(m, width=700, height=400)
 
+            else:
+                st.error("Bayi adresi bulunamadı.")
 else:
     st.info("Henüz şehir girilmedi.")
