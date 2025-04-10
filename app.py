@@ -65,6 +65,17 @@ with st.form("sehir_form"):
             st.session_state.girisler.append(veri)
             st.success(f"{secilen_sehir} şehri {secilen_ekip} için eklendi.")
 
+# Handling user inputs for teams and team members
+if "team_members" not in st.session_state:
+    st.session_state.team_members = {}
+
+with st.sidebar:
+    st.header("👷‍♂️ Ekip Üyeleri")
+    for i in range(ekip_sayisi):
+        team_name = f"Ekip {i+1}"
+        team_members = st.text_area(f"{team_name} Üyeleri", placeholder="Adları virgülle ayırarak girin")
+        st.session_state.team_members[team_name] = team_members.split(",") if team_members else []
+
 st.divider()
 
 # Display the map and the calculated distances between the cities
@@ -74,9 +85,21 @@ if st.session_state.girisler:
 
     ekipler = df["Ekip"].unique()
     for ekip in ekipler:
-        st.markdown(f"### 👷 {ekip}")
+        st.markdown(f"### 👷 {ekip} - Ekip Üyeleri: {', '.join(st.session_state.team_members.get(ekip, []))}")
         ekip_df = df[df["Ekip"] == ekip].reset_index(drop=True)
 
+        # Add a delete button for each row
+        delete_buttons = []
+        for i in range(len(ekip_df)):
+            delete_button = st.button(f"❌ Sil", key=f"delete_{ekip}_{i}")
+            if delete_button:
+                st.session_state.girisler.remove(ekip_df.iloc[i].to_dict())
+
+        # Update DataFrame and display the table without the deleted rows
+        ekip_df = pd.DataFrame(st.session_state.girisler)
+        st.dataframe(ekip_df.drop(columns=["İş Tanımı"]), use_container_width=True)
+
+        # Calculate and display other details (distance, cost, etc.)
         rota = [baslangic_sehri] + ekip_df["Şehir"].tolist()
         toplam_mesafe = 0
         yakit_maliyeti = 0
@@ -97,12 +120,6 @@ if st.session_state.girisler:
 
         ekip_df["İşçilik Maliyeti"] = ekip_df["Montaj Süresi"] * iscilik_saat_ucreti
         ekip_df["Toplam Satır Maliyeti"] = ekip_df["İşçilik Maliyeti"] + ekip_df["Ek Maliyet"]
-
-        st.dataframe(ekip_df.drop(columns=["İş Tanımı"]), use_container_width=True)
-
-        with st.expander("📍 Mesafeler Arası Detaylar"):
-            for m in mesafe_listesi:
-                st.markdown(f"- {m}")
 
         st.markdown(f"**🧭 Toplam Mesafe:** {toplam_mesafe:.1f} km")
         st.markdown(f"**⛽ Yakıt Maliyeti:** {yakit_maliyeti:,.2f} TL")
@@ -139,17 +156,3 @@ if st.session_state.girisler:
                             free_route = folium.PolyLine(route_coords, color="green", weight=4, opacity=0.7).add_to(m)
 
                         # Add step information
-                        for i, step in enumerate(steps):
-                            folium.Marker([step['end_location']['lat'], step['end_location']['lng']], 
-                                          popup=f"{step['html_instructions']} | Mesafe: {step['distance']['text']} | Süre: {step['duration']['text']}").add_to(m)
-                else:
-                    st.error("Bayi koordinatları alınamadı.")
-            else:
-                st.error("Bayi adı bulunamadı.")
-        else:
-            st.error("Bayi adı girilmedi.")
-
-        st_folium(m, width=700, height=400)
-
-else:
-    st.info("Henüz şehir girilmedi.")
