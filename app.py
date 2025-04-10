@@ -118,12 +118,7 @@ if st.session_state.girisler:
         m = folium.Map(location=sehir_koordinatlari[baslangic_sehri], zoom_start=6)
         koordinatlar = [sehir_koordinatlari[s] for s in rota]
         AntPath(locations=koordinatlar, color="blue").add_to(m)
-        
-        # Show directions on the map
-        for step in directions[0]['legs'][0]['steps']:
-            folium.Marker([step['end_location']['lat'], step['end_location']['lng']], 
-                          popup=step['html_instructions']).add_to(m)
-        
+
         # Add markers for the cities
         for i, sehir in enumerate(rota):
             folium.Marker(
@@ -131,7 +126,25 @@ if st.session_state.girisler:
                 popup=sehir,
                 tooltip=f"{i+1}. {sehir}"
             ).add_to(m)
-        
+
+        # If the user has provided a bayi name, geocode it
+        if bayi_adi:
+            geocode_result = gmaps.geocode(bayi_adi)
+            if geocode_result:
+                bayi_koordinatlari = geocode_result[0]['geometry']['location']
+                folium.Marker(
+                    [bayi_koordinatlari['lat'], bayi_koordinatlari['lng']],
+                    popup=bayi_adi,
+                    icon=folium.Icon(color="red")
+                ).add_to(m)
+                st.markdown(f"🏢 Bayi {bayi_adi} haritada işaretlendi.")
+
+                # Show directions to the bayi
+                directions_bayi = gmaps.directions(baslangic_sehri, bayi_adi, mode="driving")
+                for step in directions_bayi[0]['legs'][0]['steps']:
+                    folium.Marker([step['end_location']['lat'], step['end_location']['lng']], 
+                                  popup=step['html_instructions']).add_to(m)
+
         st_folium(m, width=700, height=400)
 
 else:
