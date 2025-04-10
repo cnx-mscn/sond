@@ -116,6 +116,7 @@ if st.session_state.girisler:
             if geocode_result:
                 bayi_koordinatlari = geocode_result[0]['geometry']['location']
                 if bayi_koordinatlari:
+                    m = folium.Map(location=sehir_koordinatlari[baslangic_sehri], zoom_start=6)
                     folium.Marker(
                         [bayi_koordinatlari['lat'], bayi_koordinatlari['lng']],
                         popup=bayi_adi,
