@@ -1,16 +1,13 @@
 import streamlit as st
-import pandas as pd
 import folium
-from streamlit_folium import st_folium
-from geopy.distance import geodesic
 import googlemaps
+from folium.plugins import AntPath
+from streamlit_folium import st_folium
 
-# Google Maps API key
+# Google Maps API Key (buraya kendi anahtarınızı eklemelisiniz)
 gmaps = googlemaps.Client(key="AIzaSyDwQVuPcON3rGSibcBrwhxQvz4HLTpF9Ws")
 
-st.set_page_config("Montaj Rota Planlayıcı", layout="wide")
-st.title("🛠️ Montaj Rota Planlayıcı ve Maliyet Hesaplayıcı")
-
+# Şehirler ve koordinatlar
 sehir_koordinatlari = {
     "Gebze": (40.8028, 29.4307),
     "İstanbul": (41.0082, 28.9784),
@@ -24,122 +21,65 @@ sehir_koordinatlari = {
     "Gaziantep": (37.0662, 37.3833),
 }
 
-sehir_listesi = list(sehir_koordinatlari.keys())
+# Streamlit kullanıcı girişi
+st.set_page_config("Rota ve Süre Hesaplayıcı", layout="wide")
+st.title("🚗 Rota ve Süre Hesaplayıcı")
 
-# Initialize session state for 'girisler' if it doesn't exist
-if "girisler" not in st.session_state:
-    st.session_state.girisler = []
+# Başlangıç ve varış şehirlerini seç
+sehirler = list(sehir_koordinatlari.keys())
+baslangic_sehri = st.selectbox("Başlangıç Şehri", options=sehirler)
+varis_sehri = st.selectbox("Varış Şehri", options=sehirler)
 
-with st.sidebar:
-    st.header("⚙️ Genel Ayarlar")
-    ekip_sayisi = st.number_input("Ekip Sayısı", 1, 10, 2)
-    yakit_tuketim = st.number_input("Araç Yakıt Tüketimi (L/100km)", 4.0, 20.0, 8.0)
-    benzin_fiyati = st.number_input("Benzin Litre Fiyatı (TL)", 10.0, 100.0, 43.50)
-    iscilik_saat_ucreti = st.number_input("İşçilik Saatlik Ücreti (TL)", 50, 1000, 150)
-    baslangic_sehri = st.selectbox("Yola Çıkılacak Şehir", options=sehir_listesi, index=sehir_listesi.index("Gebze"))
+if baslangic_sehri and varis_sehri:
+    # Google Maps API ile rota almak
+    route = gmaps.directions(
+        baslangic_sehri,
+        varis_sehri,
+        mode="driving",
+        departure_time="now"
+    )
 
-st.subheader("➕ Şehir ve İş Ekleme")
-with st.form("sehir_form"):
-    col1, col2 = st.columns(2)
-    with col1:
-        secilen_sehir = st.selectbox("📍 Şehir Seç", options=sehir_listesi)
-        secilen_ekip = st.selectbox("👷 Ekip Seç", [f"Ekip {i+1}" for i in range(ekip_sayisi)])
-        montaj_suresi = st.number_input("Montaj Süresi (saat)", 1, 72, 4)
-    with col2:
-        bayi_adi = st.text_input("🏢 Bayi Adı (Adres)", placeholder="Örn: Konya Merkez")
-        is_tanimi = st.text_area("📝 İş Tanımı", height=100)
-        ek_maliyet = st.number_input("Ekstra Maliyet (TL)", 0, 100000, 0)
+    if route:
+        # Rota bilgilerini al
+        steps = route[0]['legs'][0]['steps']
+        toplam_mesafe = route[0]['legs'][0]['distance']['text']
+        toplam_sure = route[0]['legs'][0]['duration']['text']
 
-    gonder_btn = st.form_submit_button("✅ Şehri Ekle")
+        # Rota üzerinde şehirler arası yol bilgisi
+        st.subheader("🚙 Rota Bilgisi")
+        st.markdown(f"**Mesafe:** {toplam_mesafe}")
+        st.markdown(f"**Süre:** {toplam_sure}")
 
-    if gonder_btn:
-        if secilen_sehir and secilen_ekip:
-            veri = {
-                "Ekip": secilen_ekip,
-                "Şehir": secilen_sehir,
-                "Montaj Süresi": montaj_suresi,
-                "Bayi": bayi_adi,
-                "İş Tanımı": is_tanimi,
-                "Ek Maliyet": ek_maliyet
-            }
-            st.session_state.girisler.append(veri)
-            st.success(f"{secilen_sehir} şehri {secilen_ekip} için eklendi.")
+        # Yol üzerindeki adımları ve mesafeleri göster
+        for step in steps:
+            st.markdown(f"- {step['html_instructions']} ({step['distance']['text']})")
 
-st.divider()
+        # Harita üzerinde rota çizimi
+        m = folium.Map(location=sehir_koordinatlari[baslangic_sehri], zoom_start=6)
+        koordinatlar = [(sehir_koordinatlari[baslangic_sehri],)]
+        
+        for step in steps:
+            # Her adımı işaretlemek için koordinatlar ekleyelim
+            lat_lng = step['end_location']
+            koordinatlar.append((lat_lng['lat'], lat_lng['lng']))
 
-# Check if there are any entries in the session state
-if len(st.session_state.girisler) > 0:
-    st.subheader("📋 Montaj Planı")
-    df = pd.DataFrame(st.session_state.girisler)
+        # Rota çizimini yapalım
+        AntPath(locations=koordinatlar, color="blue").add_to(m)
+        
+        # Başlangıç ve varış şehirlerini işaretleyelim
+        folium.Marker(
+            sehir_koordinatlari[baslangic_sehri],
+            popup=baslangic_sehri,
+            icon=folium.Icon(color="green")
+        ).add_to(m)
 
-    ekipler = df["Ekip"].unique()
-    for ekip in ekipler:
-        st.markdown(f"### 👷 {ekip}")
-        ekip_df = df[df["Ekip"] == ekip].reset_index(drop=True)
+        folium.Marker(
+            sehir_koordinatlari[varis_sehri],
+            popup=varis_sehri,
+            icon=folium.Icon(color="red")
+        ).add_to(m)
 
-        rota = [baslangic_sehri] + ekip_df["Şehir"].tolist()
-        toplam_mesafe = 0
-        yakit_maliyeti = 0
-        mesafe_listesi = []
-
-        for i in range(len(rota)-1):
-            konum1 = sehir_koordinatlari[rota[i]]
-            konum2 = sehir_koordinatlari[rota[i+1]]
-            mesafe = geodesic(konum1, konum2).km
-            mesafe_listesi.append(f"{rota[i]} → {rota[i+1]} = {mesafe:.1f} km")
-            toplam_mesafe += mesafe
-            yakit_maliyeti += (mesafe * yakit_tuketim / 100) * benzin_fiyati
-
-        toplam_sure = ekip_df["Montaj Süresi"].sum()
-        diger_maliyet = ekip_df["Ek Maliyet"].sum()
-        iscilik_maliyeti = toplam_sure * iscilik_saat_ucreti
-        toplam_maliyet = iscilik_maliyeti + yakit_maliyeti + diger_maliyet
-
-        ekip_df["İşçilik Maliyeti"] = ekip_df["Montaj Süresi"] * iscilik_saat_ucreti
-        ekip_df["Toplam Satır Maliyeti"] = ekip_df["İşçilik Maliyeti"] + ekip_df["Ek Maliyet"]
-
-        st.dataframe(ekip_df.drop(columns=["İş Tanımı"]), use_container_width=True)
-
-        with st.expander("📍 Mesafeler Arası Detaylar"):
-            for m in mesafe_listesi:
-                st.markdown(f"- {m}")
-
-        st.markdown(f"**🧭 Toplam Mesafe:** {toplam_mesafe:.1f} km")
-        st.markdown(f"**⛽ Yakıt Maliyeti:** {yakit_maliyeti:,.2f} TL")
-        st.markdown(f"**🛠️ İşçilik Maliyeti:** {iscilik_maliyeti:,.2f} TL")
-        st.markdown(f"**💰 Toplam Maliyet:** {toplam_maliyet:,.2f} TL")
-
-        # Check if the Bayi address is not empty
-        if bayi_adi:
-            # Get the coordinates of the bayi address using Google Geocoding API
-            geocode_result = gmaps.geocode(bayi_adi)
-
-            if geocode_result:
-                bayi_koordinat = geocode_result[0]['geometry']['location']
-                bayi_lat = bayi_koordinat['lat']
-                bayi_lng = bayi_koordinat['lng']
-
-                # Create a map centered on the starting city
-                m = folium.Map(location=sehir_koordinatlari[baslangic_sehri], zoom_start=6)
-
-                # Add a marker for the starting city
-                folium.Marker(
-                    sehir_koordinatlari[baslangic_sehri],
-                    popup=baslangic_sehri,
-                    tooltip="Başlangıç Şehri"
-                ).add_to(m)
-
-                # Add a marker for the bayi address
-                folium.Marker(
-                    [bayi_lat, bayi_lng],
-                    popup=bayi_adi,
-                    tooltip="Bayi Adresi"
-                ).add_to(m)
-
-                # Display map
-                st_folium(m, width=700, height=400)
-
-            else:
-                st.error("Bayi adresi bulunamadı.")
-else:
-    st.info("Henüz şehir girilmedi.")
+        st.subheader("📍 Rota Haritası")
+        st_folium(m, width=700, height=400)
+    else:
+        st.error("Rota alınamadı. Lütfen şehirleri tekrar kontrol edin.")
