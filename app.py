@@ -43,7 +43,8 @@ with st.form("sehir_form"):
     col1, col2 = st.columns(2)
     with col1:
         secilen_sehir = st.selectbox("📍 Şehir Seç", options=sehir_listesi)
-        secilen_ekip = st.selectbox("👷 Ekip Seç", [f"Ekip {i+1}" for i in range(ekip_sayisi)]))
+        secilen_ekip = st.selectbox("👷 Ekip Seç", [f"Ekip {i+1}" for i in range(ekip_sayisi)])
+
         montaj_suresi = st.number_input("Montaj Süresi (saat)", 1, 72, 4)
     with col2:
         bayi_adi = st.text_input("🏢 Bayi Adı", placeholder="Örn: Konya Merkez")
