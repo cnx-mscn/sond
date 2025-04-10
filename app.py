@@ -26,6 +26,10 @@ sehir_koordinatlari = {
 
 sehir_listesi = list(sehir_koordinatlari.keys())
 
+# Initialize session state for 'girisler' if it doesn't exist
+if "girisler" not in st.session_state:
+    st.session_state.girisler = []
+
 with st.sidebar:
     st.header("⚙️ Genel Ayarlar")
     ekip_sayisi = st.number_input("Ekip Sayısı", 1, 10, 2)
@@ -63,8 +67,8 @@ with st.form("sehir_form"):
 
 st.divider()
 
-# Display the map and the calculated distances between the cities
-if st.session_state.girisler:
+# Check if there are any entries in the session state
+if len(st.session_state.girisler) > 0:
     st.subheader("📋 Montaj Planı")
     df = pd.DataFrame(st.session_state.girisler)
 
