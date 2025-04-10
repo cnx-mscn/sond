@@ -110,44 +110,39 @@ if st.session_state.girisler:
 
         st.markdown("📍 Rota Haritası")
 
-        # Eğer kullanıcı bayi adını girerse, geocode işlemi yapılacak
+        # If the user has provided a bayi name, geocode it
         if bayi_adi:
             geocode_result = gmaps.geocode(bayi_adi)
             if geocode_result:
                 bayi_koordinatlari = geocode_result[0]['geometry']['location']
-                folium.Marker(
-                    [bayi_koordinatlari['lat'], bayi_koordinatlari['lng']],
-                    popup=bayi_adi,
-                    icon=folium.Icon(color="red")
-                ).add_to(m)
+                if bayi_koordinatlari:
+                    folium.Marker(
+                        [bayi_koordinatlari['lat'], bayi_koordinatlari['lng']],
+                        popup=bayi_adi,
+                        icon=folium.Icon(color="red")
+                    ).add_to(m)
+                    st.markdown(f"🏢 Bayi {bayi_adi} haritada işaretlendi.")
 
-                st.markdown(f"🏢 Bayi {bayi_adi} haritada işaretlendi.")
+                    # Show directions to the bayi
+                    directions_bayi = gmaps.directions(baslangic_sehri, bayi_adi, mode="driving")
+                    
+                    for route in directions_bayi:
+                        steps = route['legs'][0]['steps']
+                        route_coords = [(step['end_location']['lat'], step['end_location']['lng']) for step in steps]
+                        folium.PolyLine(route_coords, color="blue", weight=4, opacity=0.7).add_to(m)
+                        
+                        # Add step information
+                        for i, step in enumerate(steps):
+                            folium.Marker([step['end_location']['lat'], step['end_location']['lng']], 
+                                          popup=f"{step['html_instructions']} | Mesafe: {step['distance']['text']} | Süre: {step['duration']['text']}").add_to(m)
+                else:
+                    st.error("Bayi koordinatları alınamadı.")
+            else:
+                st.error("Bayi adı bulunamadı.")
+        else:
+            st.error("Bayi adı girilmedi.")
 
-                # Karayolu rotası alınıyor
-                directions_bayi = gmaps.directions(baslangic_sehri, bayi_adi, mode="driving", alternatives=True)
-
-                # Harita oluşturuluyor
-                m = folium.Map(location=sehir_koordinatlari[baslangic_sehri], zoom_start=6)
-                
-                for route in directions_bayi:
-                    route_coords = [(step['end_location']['lat'], step['end_location']['lng']) for step in route['legs'][0]['steps']]
-                    AntPath(locations=route_coords, color="blue").add_to(m)
-
-                    # Rota adımları ve mesafeleri haritada gösteriliyor
-                    total_distance = 0
-                    total_duration = 0
-                    for step in route['legs'][0]['steps']:
-                        distance = step['distance']['text']
-                        duration = step['duration']['text']
-                        total_distance += step['distance']['value']
-                        total_duration += step['duration']['value']
-
-                        folium.Marker(
-                            [step['end_location']['lat'], step['end_location']['lng']],
-                            popup=f"Mesafe: {distance}, Süre: {duration}",
-                        ).add_to(m)
-
-                st_folium(m, width=700, height=400)
+        st_folium(m, width=700, height=400)
 
 else:
     st.info("Henüz şehir girilmedi.")
