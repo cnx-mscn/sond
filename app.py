@@ -7,7 +7,7 @@ from folium.plugins import AntPath
 import googlemaps
 
 # Google Maps API key
-gmaps = googlemaps.Client(key="YOUR_GOOGLE_MAPS_API_KEY")
+gmaps = googlemaps.Client(key="AIzaSyDwQVuPcON3rGSibcBrwhxQvz4HLTpF9Ws")
 
 st.set_page_config("Montaj Rota Planlayıcı", layout="wide")
 st.title("🛠️ Montaj Rota Planlayıcı ve Maliyet Hesaplayıcı")
