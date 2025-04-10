@@ -3,7 +3,6 @@ import pandas as pd
 import folium
 from streamlit_folium import st_folium
 from geopy.distance import geodesic
-from folium.plugins import AntPath
 import googlemaps
 
 # Google Maps API key
@@ -27,9 +26,6 @@ sehir_koordinatlari = {
 
 sehir_listesi = list(sehir_koordinatlari.keys())
 
-if "girisler" not in st.session_state:
-    st.session_state.girisler = []
-
 with st.sidebar:
     st.header("⚙️ Genel Ayarlar")
     ekip_sayisi = st.number_input("Ekip Sayısı", 1, 10, 2)
@@ -44,10 +40,9 @@ with st.form("sehir_form"):
     with col1:
         secilen_sehir = st.selectbox("📍 Şehir Seç", options=sehir_listesi)
         secilen_ekip = st.selectbox("👷 Ekip Seç", [f"Ekip {i+1}" for i in range(ekip_sayisi)])
-
         montaj_suresi = st.number_input("Montaj Süresi (saat)", 1, 72, 4)
     with col2:
-        bayi_adi = st.text_input("🏢 Bayi Adı", placeholder="Örn: Konya Merkez")
+        bayi_adi = st.text_input("🏢 Bayi Adı (Adres)", placeholder="Örn: Konya Merkez")
         is_tanimi = st.text_area("📝 İş Tanımı", height=100)
         ek_maliyet = st.number_input("Ekstra Maliyet (TL)", 0, 100000, 0)
 
@@ -110,30 +105,34 @@ if st.session_state.girisler:
         st.markdown(f"**🛠️ İşçilik Maliyeti:** {iscilik_maliyeti:,.2f} TL")
         st.markdown(f"**💰 Toplam Maliyet:** {toplam_maliyet:,.2f} TL")
 
-        st.markdown("📍 Rota Haritası")
+        # Check if the Bayi address is not empty
+        if bayi_adi:
+            # Get route using Google Maps Directions API
+            directions = gmaps.directions(baslangic_sehri, bayi_adi, mode="driving")
 
-        # Get the route using Google Maps API directions
-        directions = gmaps.directions(baslangic_sehri, ekip_df["Şehir"].iloc[0], mode="driving")
+            # Create a map centered on the starting city
+            m = folium.Map(location=sehir_koordinatlari[baslangic_sehri], zoom_start=6)
 
-        # Create the map
-        m = folium.Map(location=sehir_koordinatlari[baslangic_sehri], zoom_start=6)
-        koordinatlar = [sehir_koordinatlari[s] for s in rota]
-        AntPath(locations=koordinatlar, color="blue").add_to(m)
-        
-        # Show directions on the map
-        for step in directions[0]['legs'][0]['steps']:
-            folium.Marker([step['end_location']['lat'], step['end_location']['lng']], 
-                          popup=step['html_instructions']).add_to(m)
-        
-        # Add markers for the cities
-        for i, sehir in enumerate(rota):
+            # Add directions as a polyline on the map
+            for step in directions[0]['legs'][0]['steps']:
+                folium.Marker([step['end_location']['lat'], step['end_location']['lng']], 
+                              popup=step['html_instructions']).add_to(m)
+
+            # Add markers for the starting and destination cities
             folium.Marker(
-                sehir_koordinatlari[sehir],
-                popup=sehir,
-                tooltip=f"{i+1}. {sehir}"
+                sehir_koordinatlari[baslangic_sehri],
+                popup=baslangic_sehri,
+                tooltip="Başlangıç Şehri"
             ).add_to(m)
-        
-        st_folium(m, width=700, height=400)
+
+            folium.Marker(
+                directions[0]['legs'][0]['end_address'],
+                popup=bayi_adi,
+                tooltip="Bayi Adresi"
+            ).add_to(m)
+
+            # Display map
+            st_folium(m, width=700, height=400)
 
 else:
     st.info("Henüz şehir girilmedi.")
