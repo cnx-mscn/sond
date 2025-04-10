@@ -124,14 +124,19 @@ if st.session_state.girisler:
                     ).add_to(m)
                     st.markdown(f"🏢 Bayi {bayi_adi} haritada işaretlendi.")
 
-                    # Show directions to the bayi
-                    directions_bayi = gmaps.directions(baslangic_sehri, bayi_adi, mode="driving")
+                    # Get directions with alternatives
+                    directions_bayi = gmaps.directions(baslangic_sehri, bayi_adi, mode="driving", alternatives=True)
                     
                     for route in directions_bayi:
                         steps = route['legs'][0]['steps']
                         route_coords = [(step['end_location']['lat'], step['end_location']['lng']) for step in steps]
-                        folium.PolyLine(route_coords, color="blue", weight=4, opacity=0.7).add_to(m)
                         
+                        # For each route, highlight it in different colors
+                        if "toll" in route['legs'][0]:
+                            toll_route = folium.PolyLine(route_coords, color="red", weight=4, opacity=0.7).add_to(m)
+                        else:
+                            free_route = folium.PolyLine(route_coords, color="green", weight=4, opacity=0.7).add_to(m)
+
                         # Add step information
                         for i, step in enumerate(steps):
                             folium.Marker([step['end_location']['lat'], step['end_location']['lng']], 
