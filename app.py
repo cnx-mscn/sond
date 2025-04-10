@@ -3,7 +3,6 @@ import pandas as pd
 import folium
 from streamlit_folium import st_folium
 from geopy.distance import geodesic
-from folium.plugins import AntPath
 import googlemaps
 
 # Google Maps API key
@@ -111,23 +110,7 @@ if st.session_state.girisler:
 
         st.markdown("📍 Rota Haritası")
 
-        # Get the route using Google Maps API directions
-        directions = gmaps.directions(baslangic_sehri, ekip_df["Şehir"].iloc[0], mode="driving")
-
-        # Create the map
-        m = folium.Map(location=sehir_koordinatlari[baslangic_sehri], zoom_start=6)
-        koordinatlar = [sehir_koordinatlari[s] for s in rota]
-        AntPath(locations=koordinatlar, color="blue").add_to(m)
-
-        # Add markers for the cities
-        for i, sehir in enumerate(rota):
-            folium.Marker(
-                sehir_koordinatlari[sehir],
-                popup=sehir,
-                tooltip=f"{i+1}. {sehir}"
-            ).add_to(m)
-
-        # If the user has provided a bayi name, geocode it
+        # Eğer kullanıcı bayi adını girerse, geocode işlemi yapılacak
         if bayi_adi:
             geocode_result = gmaps.geocode(bayi_adi)
             if geocode_result:
@@ -137,15 +120,34 @@ if st.session_state.girisler:
                     popup=bayi_adi,
                     icon=folium.Icon(color="red")
                 ).add_to(m)
+
                 st.markdown(f"🏢 Bayi {bayi_adi} haritada işaretlendi.")
 
-                # Show directions to the bayi
-                directions_bayi = gmaps.directions(baslangic_sehri, bayi_adi, mode="driving")
-                for step in directions_bayi[0]['legs'][0]['steps']:
-                    folium.Marker([step['end_location']['lat'], step['end_location']['lng']], 
-                                  popup=step['html_instructions']).add_to(m)
+                # Karayolu rotası alınıyor
+                directions_bayi = gmaps.directions(baslangic_sehri, bayi_adi, mode="driving", alternatives=True)
 
-        st_folium(m, width=700, height=400)
+                # Harita oluşturuluyor
+                m = folium.Map(location=sehir_koordinatlari[baslangic_sehri], zoom_start=6)
+                
+                for route in directions_bayi:
+                    route_coords = [(step['end_location']['lat'], step['end_location']['lng']) for step in route['legs'][0]['steps']]
+                    AntPath(locations=route_coords, color="blue").add_to(m)
+
+                    # Rota adımları ve mesafeleri haritada gösteriliyor
+                    total_distance = 0
+                    total_duration = 0
+                    for step in route['legs'][0]['steps']:
+                        distance = step['distance']['text']
+                        duration = step['duration']['text']
+                        total_distance += step['distance']['value']
+                        total_duration += step['duration']['value']
+
+                        folium.Marker(
+                            [step['end_location']['lat'], step['end_location']['lng']],
+                            popup=f"Mesafe: {distance}, Süre: {duration}",
+                        ).add_to(m)
+
+                st_folium(m, width=700, height=400)
 
 else:
     st.info("Henüz şehir girilmedi.")
