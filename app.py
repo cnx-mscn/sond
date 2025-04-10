@@ -66,15 +66,28 @@ with st.form("sehir_form"):
 
 st.divider()
 
-# Display the map and the calculated distances between the cities
+# Allow user to remove an entry
 if st.session_state.girisler:
     st.subheader("📋 Montaj Planı")
     df = pd.DataFrame(st.session_state.girisler)
+
+    # Show user a table of the current plan with an option to delete entries
+    st.dataframe(df, use_container_width=True)
+    delete_idx = st.selectbox("🔴 Silinecek Satır Seçin", options=[i for i in range(len(df))])
+    if st.button("❌ Seçilen Satırı Sil"):
+        if delete_idx is not None:
+            st.session_state.girisler.pop(delete_idx)
+            st.success("Seçilen şehir başarıyla silindi.")
+            st.experimental_rerun()  # Refresh the app
 
     ekipler = df["Ekip"].unique()
     for ekip in ekipler:
         st.markdown(f"### 👷 {ekip}")
         ekip_df = df[df["Ekip"] == ekip].reset_index(drop=True)
+
+        # Show number of people and their names
+        ekip_uyeleri = [f"Ekip {i+1}" for i in range(ekip_sayisi)]
+        st.markdown(f"**Ekip Üyeleri:** {', '.join(ekip_uyeleri)}")
 
         rota = [baslangic_sehri] + ekip_df["Şehir"].tolist()
         toplam_mesafe = 0
