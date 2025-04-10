@@ -110,28 +110,43 @@ if st.session_state.girisler:
 
         st.markdown("📍 Rota Haritası")
 
-        # Get directions with Google Maps API
-        directions = gmaps.directions(baslangic_sehri, ekip_df["Şehir"].iloc[0], mode="driving", alternatives=True)
+        # If the user has provided a bayi name, geocode it
+        if bayi_adi:
+            geocode_result = gmaps.geocode(bayi_adi)
+            if geocode_result:
+                bayi_koordinatlari = geocode_result[0]['geometry']['location']
+                if bayi_koordinatlari:
+                    m = folium.Map(location=sehir_koordinatlari[baslangic_sehri], zoom_start=6)
+                    folium.Marker(
+                        [bayi_koordinatlari['lat'], bayi_koordinatlari['lng']],
+                        popup=bayi_adi,
+                        icon=folium.Icon(color="red")
+                    ).add_to(m)
+                    st.markdown(f"🏢 Bayi {bayi_adi} haritada işaretlendi.")
 
-        # Create the map
-        m = folium.Map(location=sehir_koordinatlari[baslangic_sehri], zoom_start=6)
-        koordinatlar = [sehir_koordinatlari[s] for s in rota]
+                    # Get directions with alternatives
+                    directions_bayi = gmaps.directions(baslangic_sehri, bayi_adi, mode="driving", alternatives=True)
+                    
+                    for route in directions_bayi:
+                        steps = route['legs'][0]['steps']
+                        route_coords = [(step['end_location']['lat'], step['end_location']['lng']) for step in steps]
+                        
+                        # For each route, highlight it in different colors
+                        if "toll" in route['legs'][0]:
+                            toll_route = folium.PolyLine(route_coords, color="red", weight=4, opacity=0.7).add_to(m)
+                        else:
+                            free_route = folium.PolyLine(route_coords, color="green", weight=4, opacity=0.7).add_to(m)
 
-        # Add polyline for the route
-        folium.PolyLine(koordinatlar, color="blue", weight=4, opacity=0.7).add_to(m)
-
-        # Add markers for each city
-        for i, sehir in enumerate(rota):
-            folium.Marker(
-                sehir_koordinatlari[sehir],
-                popup=sehir,
-                tooltip=f"{i+1}. {sehir}"
-            ).add_to(m)
-
-        # Show directions steps on the map
-        for step in directions[0]['legs'][0]['steps']:
-            folium.Marker([step['end_location']['lat'], step['end_location']['lng']], 
-                          popup=f"{step['html_instructions']} | Mesafe: {step['distance']['text']} | Süre: {step['duration']['text']}").add_to(m)
+                        # Add step information
+                        for i, step in enumerate(steps):
+                            folium.Marker([step['end_location']['lat'], step['end_location']['lng']], 
+                                          popup=f"{step['html_instructions']} | Mesafe: {step['distance']['text']} | Süre: {step['duration']['text']}").add_to(m)
+                else:
+                    st.error("Bayi koordinatları alınamadı.")
+            else:
+                st.error("Bayi adı bulunamadı.")
+        else:
+            st.error("Bayi adı girilmedi.")
 
         st_folium(m, width=700, height=400)
 
