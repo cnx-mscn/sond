@@ -61,9 +61,13 @@ st.sidebar.subheader("🛣️ Başlangıç Konumunu Girin")
 if st.session_state.aktif_ekip:
     baslangic_sehir = st.text_input("Başlangıç Şehri")
     if baslangic_sehir:
-        st.session_state.baslangic_sehri = baslangic_sehri
-        st.session_state.ekipler[st.session_state.aktif_ekip]["baslangic"] = baslangic_sehri
-        st.success(f"{baslangic_sehir} başlangıç noktası olarak seçildi.")
+        # Başlangıç şehri yalnızca bir kez girilsin
+        if st.session_state.baslangic_sehri is None:
+            st.session_state.baslangic_sehri = baslangic_sehir
+            st.session_state.ekipler[st.session_state.aktif_ekip]["baslangic"] = baslangic_sehir
+            st.success(f"{baslangic_sehir} başlangıç noktası olarak seçildi.")
+        else:
+            st.warning("Başlangıç şehri zaten belirlenmiş. Değiştirmek için sıfırlama yapın.")
 
 # Şehir/Bayi Ekleme
 st.subheader("📍 Bayi / Şehir Ekle")
