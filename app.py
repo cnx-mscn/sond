@@ -57,7 +57,11 @@ with st.sidebar.expander("👤 Ekip Üyeleri"):
 # Başlangıç Noktası Seçimi
 st.sidebar.subheader("🛣️ Ekip Başlangıç Noktası")
 if st.session_state.aktif_ekip:
-    baslangic_sehir = st.selectbox("Başlangıç Şehri", ["Seçiniz"] + [sehir['sehir'] for sehir in st.session_state.sehirler])
+    # Şehir listesi başlangıç noktasına göre güncelleniyor
+    sehirler_listesi = ["Seçiniz"] + [sehir['sehir'] for sehir in st.session_state.sehirler]
+    baslangic_sehir = st.selectbox("Başlangıç Şehri", sehirler_listesi)
+    
+    # Başlangıç şehri seçildiğinde, bu şehri aktif ekibin başlangıç noktası olarak kaydediyoruz
     if baslangic_sehir != "Seçiniz":
         st.session_state.ekipler[st.session_state.aktif_ekip]["baslangic"] = baslangic_sehir
         st.success(f"{baslangic_sehir} başlangıç noktası olarak seçildi.")
@@ -137,13 +141,15 @@ if st.session_state.sehirler:
                         # Km başına maliyet hesaplaması
                         maliyet = distance * km_basi_maliyet  # km * fiyat
 
-                        if maliyet > sehir['yol_ucreti']:  # Eğer maliyet daha yüksekse, sıralama değiştir
-                            sehir['onem'] = 1  # Önem derecesini değiştirebiliriz
-
+                        # Mesafe ve maliyet hesaplamalarını yaptıktan sonra
                         folium.Marker(
                             [sehir['konum']['lat'], sehir['konum']['lng']],
-                            popup=f"{i+1}. {sehir['sehir']} | Mesafe: {distance} km | Süre: {time} dk | Maliyet: {maliyet} TL",
-                            icon=folium.Icon(color='blue')
+                            popup=f"{i+1}. {sehir['sehir']} | Mesafe: {distance:.2f} km | Süre: {time:.2f} dk | Maliyet: {maliyet:.2f} TL"
                         ).add_to(harita)
 
-            st_folium(harita, width=700, height=500)
+                        # Başlangıç noktasını son gittiğimiz şehir olarak güncelliyoruz
+                        baslangic_sehir = sehir['sehir']
+                        baslangic_konum = sehir['konum']
+
+            # Haritayı Streamlit içinde göster
+            st_folium(harita, width=700)
