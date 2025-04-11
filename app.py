@@ -90,6 +90,60 @@ with st.form("sehir_ekle"):
                 })
                 st.success(f"{sehir_adi} eklendi.")
         except Exception as e:
-            # Google API bağlantısı başarısız olduğunda hata mesajı
-st.error("Google API bağlantısı başarısız.")
+            st.error("Google API bağlantısı başarısız.")
 
+# Şehir Listesi ve Silme
+st.subheader("📋 Eklenen Bayiler")
+for i, veri in enumerate(st.session_state.sehirler):
+    col1, col2 = st.columns([10, 1])
+    with col1:
+        st.markdown(f"**{veri['sehir']}** | Ekip: {veri['ekip']} | Önem: {veri['onem']} ⭐ | Süre: {veri['yol_suresi']} saat | Maliyet: {veri['yol_ucreti']} TL")
+    with col2:
+        if st.button("❌", key=f"sil_{i}"):
+            st.session_state.sehirler.pop(i)
+            st.experimental_rerun()
+
+# Benzin Maliyeti ve Km Başına Fiyat
+st.sidebar.subheader("🚗 Benzin Maliyeti Hesaplama")
+benzin_fiyati = st.number_input("Benzin Fiyatı (TL/Litre)", 0, 20, 10)
+km_basi_maliyet = st.number_input("Kilometre Başına Maliyet (TL/km)", 0, 10, 5)
+
+# Harita Oluşturma ve Önem Sırasını Güncelleme
+st.subheader("🗺️ Oluşturulan Rota Haritası")
+if st.session_state.sehirler:
+    baslangic_sehir = st.session_state.ekipler[st.session_state.aktif_ekip].get("baslangic")
+    if baslangic_sehir:
+        baslangic_konum = None
+        for sehir in st.session_state.sehirler:
+            if sehir['sehir'] == baslangic_sehir:
+                baslangic_konum = sehir['konum']
+                break
+
+        if baslangic_konum:
+            harita = folium.Map(location=[baslangic_konum['lat'], baslangic_konum['lng']], zoom_start=6)
+
+            for i, sehir in enumerate(st.session_state.sehirler):
+                # Mesafe ve süre hesaplaması
+                if baslangic_konum:
+                    yol = gmaps.directions(
+                        (baslangic_konum['lat'], baslangic_konum['lng']),
+                        (sehir['konum']['lat'], sehir['konum']['lng']),
+                        mode="driving"
+                    )
+                    if yol:
+                        distance = yol[0]['legs'][0]['distance']['value'] / 1000  # km cinsinden
+                        time = yol[0]['legs'][0]['duration']['value'] / 60  # dakika cinsinden
+
+                        # Km başına maliyet hesaplaması
+                        maliyet = distance * km_basi_maliyet  # km * fiyat
+
+                        if maliyet > sehir['yol_ucreti']:  # Eğer maliyet daha yüksekse, sıralama değiştir
+                            sehir['onem'] = 1  # Önem derecesini değiştirebiliriz
+
+                        folium.Marker(
+                            [sehir['konum']['lat'], sehir['konum']['lng']],
+                            popup=f"{i+1}. {sehir['sehir']} | Mesafe: {distance} km | Süre: {time} dk | Maliyet: {maliyet} TL",
+                            icon=folium.Icon(color='blue')
+                        ).add_to(harita)
+
+            st_folium(harita, width=700, height=500)
