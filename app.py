@@ -57,19 +57,16 @@ with st.sidebar.expander("👤 Ekip Üyeleri"):
 # Başlangıç Noktası Seçimi
 st.sidebar.subheader("🛣️ Ekip Başlangıç Noktası")
 if st.session_state.aktif_ekip:
-    # Şehirler listesinde başlangıç şehri seçilebilir
-    sehirler_listesi = ["Seçiniz"] + [sehir['sehir'] for sehir in st.session_state.sehirler]
-    
-    # Başlangıç şehri seçimi
-    baslangic_sehir = st.selectbox("Başlangıç Şehri", sehirler_listesi)
-    
-    if baslangic_sehir != "Seçiniz":
-        # Başlangıç şehri seçildiğinde, bu şehri aktif ekibin başlangıç noktası olarak kaydediyoruz
-        st.session_state.ekipler[st.session_state.aktif_ekip]["baslangic"] = baslangic_sehir
-        st.success(f"{baslangic_sehir} başlangıç noktası olarak seçildi.")
+    # Kullanıcıya başlangıç adresini manuel olarak girme fırsatı veriliyor
+    baslangic_adresi = st.text_input("Başlangıç Adresi (Örn: İstanbul, Türkiye)")
+
+    if baslangic_adresi:
+        # Kullanıcı adresi girdiğinde bu adresi ekip için kaydediyoruz
+        st.session_state.ekipler[st.session_state.aktif_ekip]["baslangic"] = baslangic_adresi
+        st.success(f"{baslangic_adresi} başlangıç noktası olarak seçildi.")
     else:
         if "baslangic" not in st.session_state.ekipler[st.session_state.aktif_ekip]:
-            st.warning("Başlangıç şehri seçmediniz.")
+            st.warning("Başlangıç adresi seçmediniz.")
 
 # Şehir/Bayi Ekleme
 st.subheader("📍 Bayi / Şehir Ekle")
@@ -120,13 +117,18 @@ km_basi_maliyet = st.number_input("Kilometre Başına Maliyet (TL/km)", 0, 10, 5
 # Harita Oluşturma ve Önem Sırasını Güncelleme
 st.subheader("🗺️ Oluşturulan Rota Haritası")
 if st.session_state.sehirler:
-    baslangic_sehir = st.session_state.ekipler[st.session_state.aktif_ekip].get("baslangic")
-    if baslangic_sehir:
+    baslangic_adresi = st.session_state.ekipler[st.session_state.aktif_ekip].get("baslangic")
+    if baslangic_adresi:
         baslangic_konum = None
-        for sehir in st.session_state.sehirler:
-            if sehir['sehir'] == baslangic_sehir:
-                baslangic_konum = sehir['konum']
-                break
+        try:
+            # Başlangıç adresini geocode ederek koordinatları alıyoruz
+            geocode_result = gmaps.geocode(baslangic_adresi)
+            if geocode_result:
+                baslangic_konum = geocode_result[0]["geometry"]["location"]
+            else:
+                st.error("Başlangıç adresi bulunamadı.")
+        except Exception as e:
+            st.error("Google API bağlantısı başarısız.")
 
         if baslangic_konum:
             harita = folium.Map(location=[baslangic_konum['lat'], baslangic_konum['lng']], zoom_start=6)
@@ -153,7 +155,7 @@ if st.session_state.sehirler:
                         ).add_to(harita)
 
                         # Başlangıç noktasını son gittiğimiz şehir olarak güncelliyoruz
-                        baslangic_sehir = sehir['sehir']
+                        baslangic_adresi = sehir['sehir']
                         baslangic_konum = sehir['konum']
 
             # Haritayı Streamlit içinde göster
