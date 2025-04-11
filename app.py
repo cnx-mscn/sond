@@ -18,6 +18,8 @@ if "sehirler" not in st.session_state:
     st.session_state.sehirler = []
 if "baslangic_sehri" not in st.session_state:
     st.session_state.baslangic_sehri = None  # Başlangıç şehri için başlangıç değeri
+if "baslangic_konum" not in st.session_state:
+    st.session_state.baslangic_konum = None  # Başlangıç konumu için başlangıç değeri
 
 # Ekip Ekleme
 st.sidebar.header("👷 Ekip Yönetimi")
@@ -56,18 +58,29 @@ with st.sidebar.expander("👤 Ekip Üyeleri"):
         else:
             st.warning("Bu ekip için üye bulunmamaktadır.")
 
-# Başlangıç Noktası Seçimi (manuel giriş)
-st.sidebar.subheader("🛣️ Başlangıç Konumunu Girin")
+# Başlangıç Noktası Seçimi (Google Maps Haritası üzerinden)
+st.sidebar.subheader("🛣️ Başlangıç Konumunu Seçin")
 if st.session_state.aktif_ekip:
-    baslangic_sehir = st.text_input("Başlangıç Şehri")
-    if baslangic_sehir:
-        # Başlangıç şehri yalnızca bir kez girilsin
-        if st.session_state.baslangic_sehri is None:
-            st.session_state.baslangic_sehri = baslangic_sehir
-            st.session_state.ekipler[st.session_state.aktif_ekip]["baslangic"] = baslangic_sehir
-            st.success(f"{baslangic_sehir} başlangıç noktası olarak seçildi.")
-        else:
-            st.warning("Başlangıç şehri zaten belirlenmiş. Değiştirmek için sıfırlama yapın.")
+    map_center = [39.9334, 32.8597]  # Varsayılan olarak Ankara koordinatları
+    if st.session_state.baslangic_konum:
+        map_center = [st.session_state.baslangic_konum['lat'], st.session_state.baslangic_konum['lng']]
+
+    # Harita oluşturuluyor
+    harita = folium.Map(location=map_center, zoom_start=6)
+    
+    # Harita üzerinde marker ekleniyor (başlangıç noktası seçimi)
+    marker = folium.Marker(location=map_center, popup="Başlangıç Noktası", draggable=True)
+    marker.add_to(harita)
+    
+    # Harita üzerinde kullanıcı başlangıç noktasını seçebilsin
+    start_location = st_folium(harita, width=800, height=600)
+
+    if start_location:
+        lat = start_location['lat']
+        lng = start_location['lng']
+        st.session_state.baslangic_konum = {'lat': lat, 'lng': lng}
+        st.session_state.baslangic_sehri = f"Seçilen Konum: ({lat}, {lng})"
+        st.success(f"Başlangıç noktası olarak ({lat}, {lng}) seçildi.")
 
 # Şehir/Bayi Ekleme
 st.subheader("📍 Bayi / Şehir Ekle")
@@ -106,13 +119,9 @@ for i, veri in enumerate(st.session_state.sehirler):
 
 # Harita ve Rota Oluşturma
 st.subheader("🗺️ Oluşturulan Rota Haritası")
-if st.session_state.sehirler and st.session_state.baslangic_sehri:
+if st.session_state.sehirler and st.session_state.baslangic_konum:
     # Başlangıç noktasını bulalım
-    baslangic_konum = None
-    for sehir in st.session_state.sehirler:
-        if sehir['sehir'] == st.session_state.baslangic_sehri:
-            baslangic_konum = sehir['konum']
-            break
+    baslangic_konum = st.session_state.baslangic_konum
 
     if baslangic_konum:
         harita = folium.Map(location=[baslangic_konum['lat'], baslangic_konum['lng']], zoom_start=6)
