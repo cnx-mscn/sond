@@ -76,11 +76,14 @@ if st.session_state.aktif_ekip:
     start_location = st_folium(harita, width=800, height=600)
 
     if start_location:
-        lat = start_location['lat']
-        lng = start_location['lng']
-        st.session_state.baslangic_konum = {'lat': lat, 'lng': lng}
-        st.session_state.baslangic_sehri = f"Seçilen Konum: ({lat}, {lng})"
-        st.success(f"Başlangıç noktası olarak ({lat}, {lng}) seçildi.")
+        try:
+            lat = start_location['lat']
+            lng = start_location['lng']
+            st.session_state.baslangic_konum = {'lat': lat, 'lng': lng}
+            st.session_state.baslangic_sehri = f"Seçilen Konum: ({lat}, {lng})"
+            st.success(f"Başlangıç noktası olarak ({lat}, {lng}) seçildi.")
+        except KeyError:
+            st.error("Harita üzerinden bir konum seçmeniz gerekmektedir.")
 
 # Şehir/Bayi Ekleme
 st.subheader("📍 Bayi / Şehir Ekle")
