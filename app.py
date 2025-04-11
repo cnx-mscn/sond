@@ -16,6 +16,8 @@ if "aktif_ekip" not in st.session_state:
     st.session_state.aktif_ekip = None
 if "sehirler" not in st.session_state:
     st.session_state.sehirler = []
+if "baslangic_sehri" not in st.session_state:
+    st.session_state.baslangic_sehri = None  # Başlangıç şehri için başlangıç değeri
 
 # Ekip Ekleme
 st.sidebar.header("👷 Ekip Yönetimi")
@@ -54,19 +56,14 @@ with st.sidebar.expander("👤 Ekip Üyeleri"):
         else:
             st.warning("Bu ekip için üye bulunmamaktadır.")
 
-# Başlangıç Noktası Seçimi
-st.sidebar.subheader("🛣️ Ekip Başlangıç Noktası")
+# Başlangıç Noktası Seçimi (manuel giriş)
+st.sidebar.subheader("🛣️ Başlangıç Konumunu Girin")
 if st.session_state.aktif_ekip:
-    # Kullanıcıya başlangıç adresini manuel olarak girme fırsatı veriliyor
-    baslangic_adresi = st.text_input("Başlangıç Adresi (Örn: İstanbul, Türkiye)")
-
-    if baslangic_adresi:
-        # Kullanıcı adresi girdiğinde bu adresi ekip için kaydediyoruz
-        st.session_state.ekipler[st.session_state.aktif_ekip]["baslangic"] = baslangic_adresi
-        st.success(f"{baslangic_adresi} başlangıç noktası olarak seçildi.")
-    else:
-        if "baslangic" not in st.session_state.ekipler[st.session_state.aktif_ekip]:
-            st.warning("Başlangıç adresi seçmediniz.")
+    baslangic_sehir = st.text_input("Başlangıç Şehri")
+    if baslangic_sehir:
+        st.session_state.baslangic_sehri = baslangic_sehir
+        st.session_state.ekipler[st.session_state.aktif_ekip]["baslangic"] = baslangic_sehir
+        st.success(f"{baslangic_sehir} başlangıç noktası olarak seçildi.")
 
 # Şehir/Bayi Ekleme
 st.subheader("📍 Bayi / Şehir Ekle")
@@ -109,54 +106,35 @@ for i, veri in enumerate(st.session_state.sehirler):
             st.session_state.sehirler.pop(i)
             st.experimental_rerun()
 
-# Benzin Maliyeti ve Km Başına Fiyat
-st.sidebar.subheader("🚗 Benzin Maliyeti Hesaplama")
-benzin_fiyati = st.number_input("Benzin Fiyatı (TL/Litre)", 0, 20, 10)
-km_basi_maliyet = st.number_input("Kilometre Başına Maliyet (TL/km)", 0, 10, 5)
-
-# Harita Oluşturma ve Önem Sırasını Güncelleme
+# Harita ve Rota Oluşturma
 st.subheader("🗺️ Oluşturulan Rota Haritası")
-if st.session_state.sehirler:
-    baslangic_adresi = st.session_state.ekipler[st.session_state.aktif_ekip].get("baslangic")
-    if baslangic_adresi:
-        baslangic_konum = None
-        try:
-            # Başlangıç adresini geocode ederek koordinatları alıyoruz
-            geocode_result = gmaps.geocode(baslangic_adresi)
-            if geocode_result:
-                baslangic_konum = geocode_result[0]["geometry"]["location"]
-            else:
-                st.error("Başlangıç adresi bulunamadı.")
-        except Exception as e:
-            st.error("Google API bağlantısı başarısız.")
+if st.session_state.sehirler and st.session_state.baslangic_sehri:
+    # Başlangıç noktasını bulalım
+    baslangic_konum = None
+    for sehir in st.session_state.sehirler:
+        if sehir['sehir'] == st.session_state.baslangic_sehri:
+            baslangic_konum = sehir['konum']
+            break
 
-        if baslangic_konum:
-            harita = folium.Map(location=[baslangic_konum['lat'], baslangic_konum['lng']], zoom_start=6)
+    if baslangic_konum:
+        harita = folium.Map(location=[baslangic_konum['lat'], baslangic_konum['lng']], zoom_start=6)
 
-            for i, sehir in enumerate(st.session_state.sehirler):
-                # Mesafe ve süre hesaplaması
-                if baslangic_konum:
-                    yol = gmaps.directions(
-                        (baslangic_konum['lat'], baslangic_konum['lng']),
-                        (sehir['konum']['lat'], sehir['konum']['lng']),
-                        mode="driving"
-                    )
-                    if yol:
-                        distance = yol[0]['legs'][0]['distance']['value'] / 1000  # km cinsinden
-                        time = yol[0]['legs'][0]['duration']['value'] / 60  # dakika cinsinden
+        for sehir in st.session_state.sehirler:
+            # Mesafe ve süre hesaplaması
+            yol = gmaps.directions(
+                (baslangic_konum['lat'], baslangic_konum['lng']),
+                (sehir['konum']['lat'], sehir['konum']['lng']),
+                mode="driving"
+            )
+            if yol:
+                distance = yol[0]['legs'][0]['distance']['value'] / 1000  # km cinsinden
+                time = yol[0]['legs'][0]['duration']['value'] / 60  # dakika cinsinden
 
-                        # Km başına maliyet hesaplaması
-                        maliyet = distance * km_basi_maliyet  # km * fiyat
+                folium.Marker(
+                    [sehir['konum']['lat'], sehir['konum']['lng']],
+                    popup=f"{sehir['sehir']} | {distance} km | {time} dk",
+                    icon=folium.Icon(color="blue")
+                )
 
-                        # Mesafe ve maliyet hesaplamalarını yaptıktan sonra
-                        folium.Marker(
-                            [sehir['konum']['lat'], sehir['konum']['lng']],
-                            popup=f"{i+1}. {sehir['sehir']} | Mesafe: {distance:.2f} km | Süre: {time:.2f} dk | Maliyet: {maliyet:.2f} TL"
-                        ).add_to(harita)
-
-                        # Başlangıç noktasını son gittiğimiz şehir olarak güncelliyoruz
-                        baslangic_adresi = sehir['sehir']
-                        baslangic_konum = sehir['konum']
-
-            # Haritayı Streamlit içinde göster
-            st_folium(harita, width=700)
+        # Harita render et
+        st_folium(harita, width=800, height=600)
