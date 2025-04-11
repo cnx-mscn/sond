@@ -2,112 +2,96 @@ import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import st_folium
-from geopy.distance import geodesic
 import googlemaps
-from uuid import uuid4
 
-# Google Maps API Key
+# Google Maps API
 gmaps = googlemaps.Client(key="AIzaSyDwQVuPcON3rGSibcBrwhxQvz4HLTpF9Ws")
 
 st.set_page_config("Montaj Rota Planlayıcı", layout="wide")
-st.title("🛠️ Montaj Rota Planlayıcı ve Maliyet Hesaplayıcı")
+st.title("🛠️ Montaj Rota Planlayıcı")
 
-# Şehir koordinatları
-sehir_koordinatlari = {
-    "Gebze": (40.8028, 29.4307),
-    "İstanbul": (41.0082, 28.9784),
-    "Ankara": (39.9208, 32.8541),
-    "İzmir": (38.4192, 27.1287),
-    "Konya": (37.8746, 32.4932),
-    "Bursa": (40.1956, 29.0601),
-    "Adana": (37.0000, 35.3213),
-    "Antalya": (36.8969, 30.7133),
-    "Samsun": (41.2867, 36.33),
-    "Gaziantep": (37.0662, 37.3833),
-}
-
-sehir_listesi = list(sehir_koordinatlari.keys())
-
-if "girisler" not in st.session_state:
-    st.session_state.girisler = []
+# Veriler
+if "sehirler" not in st.session_state:
+    st.session_state.sehirler = []
 if "ekipler" not in st.session_state:
     st.session_state.ekipler = {}
 
+# Sidebar - Ekip Bilgileri
 with st.sidebar:
-    st.header("⚙️ Genel Ayarlar")
-    ekip_sayisi = st.number_input("Ekip Sayısı", 1, 10, 2)
-    for i in range(ekip_sayisi):
-        ekip_adi = st.text_input(f"👥 Ekip {i+1} Adı", f"Ekip {i+1}")
-        ekip_uyeleri = st.text_area(f"👨‍🔧 {ekip_adi} Üyeleri (virgülle ayırın)", key=f"uyeler_{i}")
+    st.header("👷‍♂️ Ekip Bilgileri")
+    ekip_adi = st.text_input("Ekip Adı", "Ekip 1")
+    ekip_uyeleri = st.text_area("Ekip Üyeleri (virgülle ayır)", "Ali, Ayşe")
+    if st.button("Ekip Ekle"):
         st.session_state.ekipler[ekip_adi] = ekip_uyeleri.split(",")
+        st.success(f"{ekip_adi} eklendi")
 
-    yakit_tuketim = st.number_input("Araç Yakıt Tüketimi (L/100km)", 4.0, 20.0, 8.0)
-    benzin_fiyati = st.number_input("Benzin Litre Fiyatı (TL)", 10.0, 100.0, 43.50)
-    iscilik_saat_ucreti = st.number_input("İşçilik Saatlik Ücreti (TL)", 50, 1000, 150)
-    baslangic_sehri = st.selectbox("Yola Çıkılacak Şehir", options=sehir_listesi, index=sehir_listesi.index("Gebze"))
-
-st.subheader("➕ Şehir ve İş Ekleme")
+# Şehir Girişi
+st.header("📍 Gidilecek Şehir Ekle")
 with st.form("sehir_form"):
-    col1, col2 = st.columns(2)
+    sehir_adi = st.text_input("Şehir veya Bayi Adı")
+    onem = st.slider("Önem Derecesi", 1, 5, 3)
+    secilen_ekip = st.selectbox("Ekip Seç", list(st.session_state.ekipler.keys()) or ["Ekip 1"])
+    montaj_suresi = st.number_input("Montaj Süresi (saat)", 1, 48, 4)
+    ek_maliyet = st.number_input("Ekstra Maliyet (TL)", 0, 10000, 0)
+    gonder = st.form_submit_button("➕ Şehri Ekle")
+
+    if gonder:
+        try:
+            sonuc = gmaps.geocode(sehir_adi)
+            if not sonuc:
+                st.error("Şehir/Bayi adı bulunamadı.")
+            else:
+                konum = sonuc[0]["geometry"]["location"]
+                st.session_state.sehirler.append({
+                    "sehir": sehir_adi,
+                    "ekip": secilen_ekip,
+                    "konum": konum,
+                    "onem": onem,
+                    "montaj_suresi": montaj_suresi,
+                    "ek_maliyet": ek_maliyet
+                })
+                st.success(f"{sehir_adi} eklendi")
+        except Exception as e:
+            st.error("Konum bilgisi alınamadı. API veya bağlantı sorunu olabilir.")
+
+# Şehir Listesi ve Silme
+st.header("📋 Şehir Listesi")
+for i, veri in enumerate(sorted(st.session_state.sehirler, key=lambda x: -x["onem"])):
+    col1, col2 = st.columns([9, 1])
     with col1:
-        secilen_sehir = st.selectbox("📍 Şehir Seç", options=sehir_listesi)
-        secilen_ekip = st.selectbox("👷 Ekip Seç", list(st.session_state.ekipler.keys()))
-        montaj_suresi = st.number_input("Montaj Süresi (saat)", 1, 72, 4)
-        onem = st.slider("🔢 Önem Derecesi (1-10)", 1, 10, 5)
+        st.markdown(f"**{veri['sehir']}** | Ekip: {veri['ekip']} | Önem: {veri['onem']} ⭐ | Süre: {veri['montaj_suresi']} saat | Maliyet: {veri['ek_maliyet']} TL")
     with col2:
-        bayi_adi = st.text_input("🏢 Bayi Adı", placeholder="Örn: Konya Merkez")
-        is_tanimi = st.text_area("📝 İş Tanımı", height=100)
-        ek_maliyet = st.number_input("Ekstra Maliyet (TL)", 0, 100000, 0)
-
-    gonder_btn = st.form_submit_button("✅ Şehri Ekle")
-
-    if gonder_btn:
-        st.session_state.girisler.append({
-            "id": str(uuid4()),
-            "Ekip": secilen_ekip,
-            "Şehir": secilen_sehir,
-            "Montaj Süresi": montaj_suresi,
-            "Önem": onem,
-            "Bayi": bayi_adi,
-            "İş Tanımı": is_tanimi,
-            "Ek Maliyet": ek_maliyet
-        })
-        st.success(f"{secilen_sehir} şehri {secilen_ekip} için eklendi.")
-
-if st.session_state.girisler:
-    st.subheader("📋 Montaj Planı")
-    for giris in st.session_state.girisler:
-        st.markdown(f"#### 🏙️ {giris['Şehir']} - {giris['Ekip']} (Önem: {giris['Önem']})")
-        st.markdown(f"**Bayi:** {giris['Bayi']}  ")
-        st.markdown(f"**İş Tanımı:** {giris['İş Tanımı']}  ")
-        st.markdown(f"**Montaj Süresi:** {giris['Montaj Süresi']} saat | **Ek Maliyet:** {giris['Ek Maliyet']} TL")
-        if st.button("❌ Sil", key=giris["id"]):
-            st.session_state.girisler = [g for g in st.session_state.girisler if g["id"] != giris["id"]]
+        if st.button("❌", key=f"sil_{i}"):
+            st.session_state.sehirler.pop(i)
             st.experimental_rerun()
 
-    st.subheader("📍 Öneme Göre Rota Oluştur")
-    for ekip, uyeler in st.session_state.ekipler.items():
-        st.markdown(f"### 👷 {ekip} Üyeleri: {', '.join(uyeler)}")
-        ekip_sehirler = sorted([g for g in st.session_state.girisler if g["Ekip"] == ekip], key=lambda x: -x["Önem"])
-        rota = [baslangic_sehri] + [g["Şehir"] for g in ekip_sehirler]
+# Harita
+st.header("🗺️ Rota Haritası")
+if st.session_state.sehirler:
+    merkez = st.session_state.sehirler[0]['konum']
+    harita = folium.Map(location=[merkez['lat'], merkez['lng']], zoom_start=6)
 
-        m = folium.Map(location=sehir_koordinatlari[baslangic_sehri], zoom_start=6)
-        for i in range(len(rota)-1):
-            g1 = rota[i]
-            g2 = rota[i+1]
-            coords1 = sehir_koordinatlari[g1]
-            coords2 = sehir_koordinatlari[g2]
-            folium.Marker(coords1, popup=g1, icon=folium.Icon(color='blue')).add_to(m)
-            folium.Marker(coords2, popup=g2, icon=folium.Icon(color='blue')).add_to(m)
+    sirali_sehirler = sorted(st.session_state.sehirler, key=lambda x: -x["onem"])
 
-            # Google Maps Directions API ile rota çizimi
-            directions = gmaps.directions(g1, g2, mode="driving")
-            steps = directions[0]['legs'][0]['steps']
-            route_coords = [(step['end_location']['lat'], step['end_location']['lng']) for step in steps]
-            folium.PolyLine(route_coords, color="green", weight=4, opacity=0.7).add_to(m)
-            folium.Marker(route_coords[-1], 
-                          popup=f"Mesafe: {directions[0]['legs'][0]['distance']['text']} | Süre: {directions[0]['legs'][0]['duration']['text']}").add_to(m)
+    for i in range(len(sirali_sehirler)-1):
+        baslangic = sirali_sehirler[i]['konum']
+        bitis = sirali_sehirler[i+1]['konum']
+        yol = gmaps.directions(
+            (baslangic['lat'], baslangic['lng']),
+            (bitis['lat'], bitis['lng']),
+            mode="driving"
+        )
+        if yol:
+            steps = yol[0]['legs'][0]['steps']
+            rota_coords = [(step['end_location']['lat'], step['end_location']['lng']) for step in steps]
+            folium.PolyLine(rota_coords, color="blue", weight=4).add_to(harita)
 
-        st_folium(m, width=700, height=500)
+    for sehir in sirali_sehirler:
+        folium.Marker(
+            [sehir['konum']['lat'], sehir['konum']['lng']],
+            popup=f"{sehir['sehir']} ({sehir['ekip']})"
+        ).add_to(harita)
+
+    st_folium(harita, width=700, height=500)
 else:
-    st.info("Henüz şehir girilmedi.")
+    st.info("Henüz rota oluşturulmadı.")
