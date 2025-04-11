@@ -90,4 +90,6 @@ with st.form("sehir_ekle"):
                 })
                 st.success(f"{sehir_adi} eklendi.")
         except Exception as e:
-            st.error("Google API bağlantısı başar
+            # Google API bağlantısı başarısız olduğunda hata mesajı
+st.error("Google API bağlantısı başarısız.")
+
