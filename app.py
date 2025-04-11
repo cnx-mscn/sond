@@ -57,14 +57,19 @@ with st.sidebar.expander("👤 Ekip Üyeleri"):
 # Başlangıç Noktası Seçimi
 st.sidebar.subheader("🛣️ Ekip Başlangıç Noktası")
 if st.session_state.aktif_ekip:
-    # Şehir listesi başlangıç noktasına göre güncelleniyor
+    # Şehirler listesinde başlangıç şehri seçilebilir
     sehirler_listesi = ["Seçiniz"] + [sehir['sehir'] for sehir in st.session_state.sehirler]
+    
+    # Başlangıç şehri seçimi
     baslangic_sehir = st.selectbox("Başlangıç Şehri", sehirler_listesi)
     
-    # Başlangıç şehri seçildiğinde, bu şehri aktif ekibin başlangıç noktası olarak kaydediyoruz
     if baslangic_sehir != "Seçiniz":
+        # Başlangıç şehri seçildiğinde, bu şehri aktif ekibin başlangıç noktası olarak kaydediyoruz
         st.session_state.ekipler[st.session_state.aktif_ekip]["baslangic"] = baslangic_sehir
         st.success(f"{baslangic_sehir} başlangıç noktası olarak seçildi.")
+    else:
+        if "baslangic" not in st.session_state.ekipler[st.session_state.aktif_ekip]:
+            st.warning("Başlangıç şehri seçmediniz.")
 
 # Şehir/Bayi Ekleme
 st.subheader("📍 Bayi / Şehir Ekle")
