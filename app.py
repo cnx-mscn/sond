@@ -1,7 +1,4 @@
 import streamlit as st
-import pandas as pd
-import folium
-from streamlit_folium import st_folium
 import googlemaps
 
 # Google Maps API Key
@@ -25,25 +22,31 @@ if st.button("➕ Ekip Oluştur") and ekip_adi:
     if ekip_adi not in st.session_state.ekipler:
         st.session_state.ekipler[ekip_adi] = []
         st.session_state.aktif_ekip = ekip_adi
+        st.success(f"{ekip_adi} oluşturuldu.")
     else:
         st.warning("Bu ekip zaten mevcut!")
 
-aktif_secim = st.sidebar.selectbox("Aktif Ekip Seç", list(st.session_state.ekipler.keys()), 
-                                    index=0 if st.session_state.aktif_ekip is None else list(st.session_state.ekipler.keys()).index(st.session_state.aktif_ekip))
-st.session_state.aktif_ekip = aktif_secim
+# Aktif ekip seçimi
+if st.session_state.ekipler:
+    aktif_secim = st.sidebar.selectbox("Aktif Ekip Seç", list(st.session_state.ekipler.keys()))
+    st.session_state.aktif_ekip = aktif_secim
+else:
+    st.warning("Henüz ekip oluşturulmadı. Lütfen bir ekip oluşturun.")
 
 # Üye Ekle / Çıkar
 with st.sidebar.expander("👤 Ekip Üyeleri"):
     yeni_uye = st.text_input("Yeni Üye Adı")
     if st.button("✅ Üye Ekle"):
-        if yeni_uye:
+        if yeni_uye and st.session_state.aktif_ekip:
             st.session_state.ekipler[st.session_state.aktif_ekip].append(yeni_uye)
-    for idx, uye in enumerate(st.session_state.ekipler[st.session_state.aktif_ekip]):
-        col1, col2 = st.columns([5,1])
-        col1.markdown(f"- {uye}")
-        if col2.button("❌", key=f"uye_sil_{idx}"):
-            st.session_state.ekipler[st.session_state.aktif_ekip].pop(idx)
-            st.experimental_rerun()
+            st.success(f"{yeni_uye} üye olarak eklendi.")
+    if st.session_state.aktif_ekip:
+        for idx, uye in enumerate(st.session_state.ekipler[st.session_state.aktif_ekip]):
+            col1, col2 = st.columns([5,1])
+            col1.markdown(f"- {uye}")
+            if col2.button("❌", key=f"uye_sil_{idx}"):
+                st.session_state.ekipler[st.session_state.aktif_ekip].pop(idx)
+                st.experimental_rerun()
 
 # Şehir/Bayi Ekleme
 st.subheader("📍 Bayi / Şehir Ekle")
@@ -115,4 +118,3 @@ if st.session_state.sehirler:
     st_folium(harita, width=800, height=600)
 else:
     st.info("Henüz şehir eklenmedi.")
-
