@@ -61,8 +61,8 @@ st.sidebar.subheader("🛣️ Başlangıç Konumunu Girin")
 if st.session_state.aktif_ekip:
     baslangic_sehir = st.text_input("Başlangıç Şehri")
     if baslangic_sehir:
-        st.session_state.baslangic_sehri = baslangic_sehir
-        st.session_state.ekipler[st.session_state.aktif_ekip]["baslangic"] = baslangic_sehir
+        st.session_state.baslangic_sehri = baslangic_sehri
+        st.session_state.ekipler[st.session_state.aktif_ekip]["baslangic"] = baslangic_sehri
         st.success(f"{baslangic_sehir} başlangıç noktası olarak seçildi.")
 
 # Şehir/Bayi Ekleme
@@ -70,9 +70,6 @@ st.subheader("📍 Bayi / Şehir Ekle")
 with st.form("sehir_ekle"):
     sehir_adi = st.text_input("Şehir veya Bayi Adı")
     onem = st.slider("Önem Derecesi", 1, 5, 3)
-    yol_suresi = st.number_input("Yol Süresi (saat)", 1, 24, 1)
-    yol_ucreti = st.number_input("Yol Ücreti (TL)", 0, 10000, 100)
-    ek_maliyet = st.number_input("Ekstra Maliyet (TL)", 0, 100000, 0)
     gonder_btn = st.form_submit_button("➕ Ekle")
 
     if gonder_btn and st.session_state.aktif_ekip:
@@ -86,10 +83,7 @@ with st.form("sehir_ekle"):
                     "sehir": sehir_adi,
                     "ekip": st.session_state.aktif_ekip,
                     "konum": konum,
-                    "onem": onem,
-                    "yol_suresi": yol_suresi,
-                    "yol_ucreti": yol_ucreti,
-                    "ek_maliyet": ek_maliyet
+                    "onem": onem
                 })
                 st.success(f"{sehir_adi} eklendi.")
         except Exception as e:
@@ -100,7 +94,7 @@ st.subheader("📋 Eklenen Bayiler")
 for i, veri in enumerate(st.session_state.sehirler):
     col1, col2 = st.columns([10, 1])
     with col1:
-        st.markdown(f"**{veri['sehir']}** | Ekip: {veri['ekip']} | Önem: {veri['onem']} ⭐ | Süre: {veri['yol_suresi']} saat | Maliyet: {veri['yol_ucreti']} TL")
+        st.markdown(f"**{veri['sehir']}** | Ekip: {veri['ekip']} | Önem: {veri['onem']} ⭐")
     with col2:
         if st.button("❌", key=f"sil_{i}"):
             st.session_state.sehirler.pop(i)
@@ -119,6 +113,11 @@ if st.session_state.sehirler and st.session_state.baslangic_sehri:
     if baslangic_konum:
         harita = folium.Map(location=[baslangic_konum['lat'], baslangic_konum['lng']], zoom_start=6)
 
+        toplam_maliyet = 0
+        toplam_sure = 0
+        toplam_mesafe = 0
+
+        # Rotayı ve maliyet hesaplamayı yapalım
         for sehir in st.session_state.sehirler:
             # Mesafe ve süre hesaplaması
             yol = gmaps.directions(
@@ -130,11 +129,30 @@ if st.session_state.sehirler and st.session_state.baslangic_sehri:
                 distance = yol[0]['legs'][0]['distance']['value'] / 1000  # km cinsinden
                 time = yol[0]['legs'][0]['duration']['value'] / 60  # dakika cinsinden
 
+                # Benzin maliyeti hesaplama (örneğin 1 km başına 0.5 TL yakıt maliyeti)
+                benzin_maliyeti = distance * 0.5  # km başına yakıt maliyeti
+
+                # İşçilik maliyeti hesaplama (örneğin, saatte 100 TL işçilik ücreti)
+                iscilik_maliyeti = time * 100 / 60  # dakika başına işçilik ücreti (100 TL/saat)
+
+                # Toplam maliyet hesaplama
+                toplam_maliyet += iscilik_maliyeti + benzin_maliyeti
+                toplam_sure += time
+                toplam_mesafe += distance
+
                 folium.Marker(
                     [sehir['konum']['lat'], sehir['konum']['lng']],
-                    popup=f"{sehir['sehir']} | {distance} km | {time} dk",
+                    popup=f"{sehir['sehir']} | {distance} km | {time} dk | Benzin: {benzin_maliyeti} TL | İşçilik: {iscilik_maliyeti} TL",
                     icon=folium.Icon(color="blue")
                 )
 
         # Harita render et
         st_folium(harita, width=800, height=600)
+
+        # Toplam maliyet ve süreyi göster
+        st.subheader("🔢 Toplam Maliyet ve Süre")
+        st.write(f"Toplam Mesafe: {toplam_mesafe:.2f} km")
+        st.write(f"Toplam Süre: {toplam_sure:.2f} dakika")
+        st.write(f"Toplam Benzin Maliyeti: {benzin_maliyeti:.2f} TL")
+        st.write(f"Toplam İşçilik Maliyeti: {iscilik_maliyeti:.2f} TL")
+        st.write(f"Toplam Maliyet: {toplam_maliyet:.2f} TL")
