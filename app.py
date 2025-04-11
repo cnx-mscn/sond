@@ -43,12 +43,16 @@ with st.sidebar.expander("👤 Ekip Üyeleri"):
             st.session_state.ekipler[st.session_state.aktif_ekip]["members"].append(yeni_uye)
             st.success(f"{yeni_uye} üye olarak eklendi.")
     if st.session_state.aktif_ekip:
-        for idx, uye in enumerate(st.session_state.ekipler[st.session_state.aktif_ekip]["members"]):
-            col1, col2 = st.columns([5, 1])
-            col1.markdown(f"- {uye}")
-            if col2.button("❌", key=f"uye_sil_{idx}"):
-                st.session_state.ekipler[st.session_state.aktif_ekip]["members"].pop(idx)
-                st.experimental_rerun()
+        # Aktif ekip seçildiyse üyeler listelensin
+        if "members" in st.session_state.ekipler[st.session_state.aktif_ekip]:
+            for idx, uye in enumerate(st.session_state.ekipler[st.session_state.aktif_ekip]["members"]):
+                col1, col2 = st.columns([5, 1])
+                col1.markdown(f"- {uye}")
+                if col2.button("❌", key=f"uye_sil_{idx}"):
+                    st.session_state.ekipler[st.session_state.aktif_ekip]["members"].pop(idx)
+                    st.experimental_rerun()
+        else:
+            st.warning("Bu ekip için üye bulunmamaktadır.")
 
 # Başlangıç Noktası Seçimi
 st.sidebar.subheader("🛣️ Ekip Başlangıç Noktası")
